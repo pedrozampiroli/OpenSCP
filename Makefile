@@ -17,7 +17,10 @@
 
 APP_NAME     := OpenSCP
 VERSION      := 1.0.0
-ENTRY        := main.py
+ENTRY        := openscp/main.py
+PYTHON       := python3
+PIP          := pip3
+PYINSTALLER  := $(PYTHON) -m PyInstaller
 
 # Platform detection - detects Windows, MinGW, MSYS, Cygwin
 UNAME_S := $(shell uname -s 2>/dev/null || echo Windows)
@@ -48,7 +51,7 @@ PYINSTALLER  := $(PYTHON) -m PyInstaller
 # Common PyInstaller args
 COMMON_ARGS := \
 	--name $(APP_NAME) \
-	--icon="icon/OpenSCPIcon.jpg" \
+	--icon="resources/icon/OpenSCPIcon.jpg" \
 	--hidden-import=paramiko \
 	--hidden-import=cryptography \
 	--hidden-import=cffi \
@@ -58,13 +61,11 @@ COMMON_ARGS := \
 # Data paths (use : on Unix, ; on Windows)
 ifeq ($(IS_WINDOWS),yes)
   DATA_SEP := ;
+  PYTHONPATH_CMD := set PYTHONPATH=.&&
 else
   DATA_SEP := :
+  PYTHONPATH_CMD := PYTHONPATH=.
 endif
-
-DATA_ARGS := \
-	--add-data "themes$(DATA_SEP)themes" \
-	--add-data "locales$(DATA_SEP)locales"
 
 # ──────────────────────────────────────────────────────────────────
 #  General
@@ -73,23 +74,20 @@ DATA_ARGS := \
 .PHONY: install run clean lint
 
 install:
-	@echo Instalando dependencias...
-	$(PIP) install PyQt6 paramiko cryptography pyinstaller Pillow
+	$(PIP) install -r requirements.txt
+	$(PIP) install pyinstaller Pillow
 
 run:
-	$(PYTHON) $(ENTRY)
+	$(PYTHONPATH_CMD) $(PYTHON) -m openscp.main
 
 clean:
 	rm -rf build/ dist/ *.spec __pycache__ .eggs *.egg-info
-	rm -f $(APP_NAME).dmg icon.png
+	rm -f $(APP_NAME).dmg
+	rm -f icon.png
 	rm -rf $(APP_NAME).AppDir
 
 lint:
-	$(PYTHON) -c "import py_compile; \
-		import glob; \
-		files = glob.glob('*.py'); \
-		[py_compile.compile(f, doraise=True) for f in files]; \
-		print(f'✓ {len(files)} files OK')"
+	$(PYTHON) -c "import py_compile, glob; files = glob.glob('openscp/**/*.py', recursive=True); [py_compile.compile(f, doraise=True) for f in files]; print(f'✓ {len(files)} files OK')"
 
 # ──────────────────────────────────────────────────────────────────
 #  macOS — .app bundle + .dmg
@@ -100,8 +98,8 @@ lint:
 build-mac:
 	$(PYINSTALLER) $(COMMON_ARGS) \
 		--windowed \
-		--add-data "themes:themes" \
-		--add-data "locales:locales" \
+		--add-data "resources/themes:resources/themes" \
+		--add-data "resources/locales:resources/locales" \
 		--osx-bundle-identifier com.openscp.app \
 		$(ENTRY)
 	@echo ""
@@ -134,8 +132,8 @@ dmg: build-mac
 build-linux:
 	$(PYINSTALLER) $(COMMON_ARGS) \
 		--onefile \
-		--add-data "themes:themes" \
-		--add-data "locales:locales" \
+		--add-data "resources/themes:resources/themes" \
+		--add-data "resources/locales:resources/locales" \
 		$(ENTRY)
 	@echo ""
 	@echo "✅  Linux build complete: dist/$(APP_NAME)"
@@ -156,7 +154,7 @@ appimage: build-linux
 	cp $(APP_NAME).AppDir/usr/share/applications/$(APP_NAME).desktop $(APP_NAME).AppDir/
 	@# Convert JPG to PNG for AppImage icon
 	@if [ ! -f icon.png ]; then \
-		$(PYTHON) -c "from PyQt6.QtGui import QGuiApplication, QImage; app = QGuiApplication([]); QImage('icon/OpenSCPIcon.jpg').save('icon.png')"; \
+		$(PYTHON) -c "from PyQt6.QtGui import QGuiApplication, QImage; app = QGuiApplication([]); QImage('resources/icon/OpenSCPIcon.jpg').save('icon.png')"; \
 	fi
 	cp icon.png $(APP_NAME).AppDir/usr/share/icons/hicolor/256x256/apps/$(APP_NAME).png
 	cp icon.png $(APP_NAME).AppDir/$(APP_NAME).png
@@ -198,8 +196,8 @@ endif
 endif
 	$(PYINSTALLER) $(COMMON_ARGS) \
 		--windowed \
-		--add-data "themes;themes" \
-		--add-data "locales;locales" \
+		--add-data "resources/themes;resources/themes" \
+		--add-data "resources/locales;resources/locales" \
 		$(ENTRY)
 ifeq ($(IS_WINDOWS),yes)
 	@echo ""

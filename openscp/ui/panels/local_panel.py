@@ -87,14 +87,9 @@ class LocalPanel(QWidget):
 
         layout.addLayout(header)
 
+        from openscp.ui.widgets.breadcrumb_navigator import BreadcrumbNavigator
         # ── Path bar ──
-        self.path_edit = QLineEdit()
-        self.path_edit.setPlaceholderText("Local path…")
-        self.path_edit.setStyleSheet("""
-            QLineEdit { background: #1e272e; color: #cfd8dc; border: 1px solid #37474f;
-                        border-radius: 4px; padding: 5px 8px; font-size: 12px; }
-            QLineEdit:focus { border-color: #42a5f5; }
-        """)
+        self.path_edit = BreadcrumbNavigator()
         layout.addWidget(self.path_edit)
 
         # ── Tree view ──
@@ -109,7 +104,7 @@ class LocalPanel(QWidget):
         home = str(Path.home())
         idx = self.model.index(home)
         self.tree.setRootIndex(idx)
-        self.path_edit.setText(home)
+        self.path_edit.set_path(home, is_remote=False)
         self.current_path = home
 
         # Show only relevant columns: Name, Size, Date Modified
@@ -142,7 +137,7 @@ class LocalPanel(QWidget):
         self.tree.doubleClicked.connect(self._on_double_click)
         self.btn_up.clicked.connect(self._go_up)
         self.btn_refresh.clicked.connect(self._refresh)
-        self.path_edit.returnPressed.connect(self._on_path_entered)
+        self.path_edit.path_entered.connect(self._on_path_entered)
         self.tree.customContextMenuRequested.connect(self._show_context_menu)
         self.tree.file_drop_requested.connect(lambda paths: self.download_requested.emit(paths))
 
@@ -153,7 +148,7 @@ class LocalPanel(QWidget):
             self.current_path = path
             idx = self.model.index(path)
             self.tree.setRootIndex(idx)
-            self.path_edit.setText(path)
+            self.path_edit.set_path(path, is_remote=False)
 
     def _on_double_click(self, index: QModelIndex):
         path = self.model.filePath(index)
@@ -168,8 +163,8 @@ class LocalPanel(QWidget):
     def _refresh(self):
         self._navigate_to(self.current_path)
 
-    def _on_path_entered(self):
-        path = self.path_edit.text().strip()
+    def _on_path_entered(self, path: str):
+        path = path.strip()
         if os.path.isdir(path):
             self._navigate_to(path)
 

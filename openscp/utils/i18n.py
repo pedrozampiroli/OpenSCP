@@ -4,9 +4,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from theme_manager import _load_settings, _save_settings
+from openscp.utils.theme_manager import _load_settings, _save_settings
 
-LOCALES_DIR = Path(__file__).parent / "locales"
+LOCALES_DIR = Path(__file__).parent.parent.parent / "resources" / "locales"
 _current_locale: str = "en"
 _translations: dict[str, str] = {}
 _callbacks: list = []  # functions to call when language changes

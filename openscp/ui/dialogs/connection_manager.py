@@ -11,8 +11,8 @@ from PyQt6.QtWidgets import (
     QFileDialog, QFormLayout, QSpinBox, QComboBox, QApplication,
 )
 
-from crypto_store import CryptoStore
-from i18n import tr
+from openscp.core.crypto_store import CryptoStore
+from openscp.utils.i18n import tr
 
 # ────────────────────────────────────────────────────────────────
 #  Session cache

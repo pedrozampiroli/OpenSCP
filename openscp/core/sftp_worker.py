@@ -169,3 +169,56 @@ class SFTPMkdirWorker(QThread):
             self.finished.emit(f"Created {self.remote_path}")
         except Exception as exc:
             self.error.emit(str(exc))
+
+
+class SFTPFileLoadWorker(QThread):
+    """Downloads a file to memory/temp for editing in background."""
+
+    progress = pyqtSignal(int, int)
+    finished = pyqtSignal(str, str, str)  # (remote_path, content, tmp_path)
+    error = pyqtSignal(str)
+
+    def __init__(self, sftp, remote_path: str, tmp_path: str):
+        super().__init__()
+        self.sftp = sftp
+        self.remote_path = remote_path
+        self.tmp_path = tmp_path
+
+    def _callback(self, transferred: int, total: int):
+        self.progress.emit(transferred, total)
+
+    def run(self):
+        try:
+            self.sftp.get(self.remote_path, self.tmp_path, callback=self._callback)
+            with open(self.tmp_path, "r", errors="replace") as f:
+                content = f.read()
+            self.finished.emit(self.remote_path, content, self.tmp_path)
+        except Exception as exc:
+            self.error.emit(str(exc))
+
+
+class SFTPFileSaveWorker(QThread):
+    """Uploads an edited file from memory/temp in background."""
+
+    progress = pyqtSignal(int, int)
+    finished = pyqtSignal(str)
+    error = pyqtSignal(str)
+
+    def __init__(self, sftp, remote_path: str, local_tmp: str, content: str):
+        super().__init__()
+        self.sftp = sftp
+        self.remote_path = remote_path
+        self.local_tmp = local_tmp
+        self.content = content
+
+    def _callback(self, transferred: int, total: int):
+        self.progress.emit(transferred, total)
+
+    def run(self):
+        try:
+            with open(self.local_tmp, "w") as f:
+                f.write(self.content)
+            self.sftp.put(self.local_tmp, self.remote_path, callback=self._callback)
+            self.finished.emit(f"Saved {os.path.basename(self.remote_path)}")
+        except Exception as exc:
+            self.error.emit(str(exc))

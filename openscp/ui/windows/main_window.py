@@ -12,18 +12,19 @@ from PyQt6.QtWidgets import (
     QTabWidget,
 )
 
-import i18n
-from i18n import tr
-import theme_manager
-from local_panel import LocalPanel
-from remote_panel import RemotePanel
-from connection_manager import ConnectionManagerDialog
-from text_editor import TextEditorWidget
-from ssh_terminal import SSHTerminalWidget
-from settings_dialog import SettingsDialog
-from sftp_worker import (
+from openscp.utils import i18n
+from openscp.utils.i18n import tr
+from openscp.utils import theme_manager
+from openscp.ui.panels.local_panel import LocalPanel
+from openscp.ui.panels.remote_panel import RemotePanel
+from openscp.ui.dialogs.connection_manager import ConnectionManagerDialog
+from openscp.ui.widgets.text_editor import TextEditorWidget
+from openscp.ui.widgets.ssh_terminal import SSHTerminalWidget
+from openscp.ui.dialogs.settings_dialog import SettingsDialog
+from openscp.ui.widgets.tasks_panel import TasksPanelWidget
+from openscp.core.sftp_worker import (
     SFTPConnectWorker, SFTPListWorker, SFTPTransferWorker,
-    SFTPDeleteWorker, SFTPMkdirWorker,
+    SFTPDeleteWorker, SFTPMkdirWorker, SFTPFileLoadWorker, SFTPFileSaveWorker,
 )
 
 BTN_STYLE = """
@@ -148,9 +149,10 @@ class MainWindow(QMainWindow):
 
         self.text_editor = TextEditorWidget()
         self.ssh_terminal = SSHTerminalWidget()
+        self.tasks_panel = TasksPanelWidget()
 
-        self.bottom_tabs.addTab(self.text_editor, "✏️ " + tr("ctx.edit").strip())
         self.bottom_tabs.addTab(self.ssh_terminal, "🖥 " + tr("terminal.title"))
+        self.bottom_tabs.addTab(self.tasks_panel, "🔄 Background Tasks")
 
         self.main_splitter.addWidget(self.bottom_tabs)
         self.main_splitter.setSizes([500, 250])
@@ -197,8 +199,7 @@ class MainWindow(QMainWindow):
         self.btn_saved.setText(tr("toolbar.connections"))
         self.btn_disconnect.setText(tr("toolbar.disconnect"))
         self.btn_settings.setText(tr("toolbar.settings"))
-        self.bottom_tabs.setTabText(0, "✏️ " + tr("ctx.edit").strip())
-        self.bottom_tabs.setTabText(1, "🖥 " + tr("terminal.title"))
+        self.bottom_tabs.setTabText(0, "🖥 " + tr("terminal.title"))
         if self.sftp_client:
             self.status_label.setText(tr("status.connected", name=self._connected_host))
         else:
@@ -234,6 +235,9 @@ class MainWindow(QMainWindow):
         self.status_label.setText(tr("status.connecting"))
 
         worker = SFTPConnectWorker(host, port, user, password, private_key, key_passphrase)
+        self.tasks_panel.add_task(worker, f"Connect: {name}")
+        worker.connected.connect(lambda: self.tasks_panel.complete_task(worker, "Connected"))
+        worker.error.connect(lambda msg: self.tasks_panel.error_task(worker, msg))
         worker.connected.connect(self._on_connected)
         worker.error.connect(self._on_connect_error)
         worker.finished.connect(lambda: self._cleanup_worker(worker))
@@ -304,6 +308,9 @@ class MainWindow(QMainWindow):
         if not self.sftp_client:
             return
         worker = SFTPListWorker(self.sftp_client, path)
+        self.tasks_panel.add_task(worker, f"List: {path}")
+        worker.finished.connect(lambda path, items: self.tasks_panel.complete_task(worker, "Listed"))
+        worker.error.connect(lambda msg: self.tasks_panel.error_task(worker, msg))
         worker.finished.connect(self._on_listing_received)
         worker.error.connect(lambda msg: QMessageBox.warning(self, "Listing Error", msg))
         worker.finished.connect(lambda *_: self._cleanup_worker(worker))
@@ -343,6 +350,11 @@ class MainWindow(QMainWindow):
         self.progress_bar.setFormat(f"{arrow} {os.path.basename(local_path)}  %p%")
 
         worker = SFTPTransferWorker(self.sftp_client, direction, local_path, remote_path)
+        self.tasks_panel.add_task(worker, f"{direction.capitalize()}: {os.path.basename(local_path)}")
+        worker.progress.connect(lambda cur, tot: self.tasks_panel.update_task_progress(worker, cur, tot))
+        worker.finished.connect(lambda msg: self.tasks_panel.complete_task(worker, msg))
+        worker.error.connect(lambda msg: self.tasks_panel.error_task(worker, msg))
+        
         worker.progress.connect(self._on_transfer_progress)
         worker.finished.connect(self._on_transfer_finished)
         worker.error.connect(self._on_transfer_error)
@@ -376,6 +388,10 @@ class MainWindow(QMainWindow):
         if not self.sftp_client:
             return
         worker = SFTPDeleteWorker(self.sftp_client, path, is_dir)
+        self.tasks_panel.add_task(worker, f"Delete: {path}")
+        worker.finished.connect(lambda msg: self.tasks_panel.complete_task(worker, msg))
+        worker.error.connect(lambda msg: self.tasks_panel.error_task(worker, msg))
+
         worker.finished.connect(lambda msg: (
             self.status_label.setText(f"  ✓ {msg}"),
             self._list_remote_dir(self.remote_panel.current_path),
@@ -389,6 +405,10 @@ class MainWindow(QMainWindow):
         if not self.sftp_client:
             return
         worker = SFTPMkdirWorker(self.sftp_client, path)
+        self.tasks_panel.add_task(worker, f"Mkdir: {path}")
+        worker.finished.connect(lambda msg: self.tasks_panel.complete_task(worker, msg))
+        worker.error.connect(lambda msg: self.tasks_panel.error_task(worker, msg))
+
         worker.finished.connect(lambda msg: (
             self.status_label.setText(f"  ✓ {msg}"),
             self._list_remote_dir(self.remote_panel.current_path),
@@ -406,30 +426,62 @@ class MainWindow(QMainWindow):
         if not self.sftp_client:
             return
         try:
+            attr = self.sftp_client.stat(remote_path)
+            if attr.st_size > 5 * 1024 * 1024:
+                msg = f"The file '{os.path.basename(remote_path)}' is {attr.st_size / (1024*1024):.1f}MB, which exceeds the recommended 5MB limit. Opening it might freeze the application.\\n\\nAre you sure you want to proceed?"
+                reply = QMessageBox.question(self, "Warning: Large File", msg,
+                                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                             QMessageBox.StandardButton.No)
+                if reply == QMessageBox.StandardButton.No:
+                    return
+
             tmp = tempfile.NamedTemporaryFile(
                 delete=False, suffix="_" + os.path.basename(remote_path))
             tmp_path = tmp.name
             tmp.close()
-            self.sftp_client.get(remote_path, tmp_path)
-            with open(tmp_path, "r", errors="replace") as f:
-                content = f.read()
-            self.text_editor.open_file(remote_path, content, tmp_path)
-            self.bottom_tabs.setCurrentIndex(0)
+
+            worker = SFTPFileLoadWorker(self.sftp_client, remote_path, tmp_path)
+            self.tasks_panel.add_task(worker, f"Load Editor: {os.path.basename(remote_path)}")
+            worker.progress.connect(lambda cur, tot: self.tasks_panel.update_task_progress(worker, cur, tot))
+            worker.error.connect(lambda msg: self.tasks_panel.error_task(worker, msg))
+            
+            def on_load_success(rpath, content, tpath):
+                self.tasks_panel.complete_task(worker, "Loaded")
+                self.text_editor.open_file(rpath, content, tpath)
+                self.text_editor.show()
+                self.text_editor.activateWindow()
+            
+            worker.finished.connect(on_load_success)
+            worker.error.connect(lambda msg: QMessageBox.warning(self, "Editor Download Error", msg))
+            worker.finished.connect(lambda *_: self._cleanup_worker(worker))
+            
+            self._workers.append(worker)
+            worker.start()
+            
         except Exception as e:
             QMessageBox.warning(self, tr("error"), str(e))
 
     def _save_editor_file(self, remote_path: str, content: str, local_tmp: str):
-        """Save editor content back to the remote server."""
+        """Save editor content back to the remote server using background thread."""
         if not self.sftp_client:
             QMessageBox.warning(self, tr("error"), tr("terminal.not_connected"))
             return
-        try:
-            with open(local_tmp, "w") as f:
-                f.write(content)
-            self.sftp_client.put(local_tmp, remote_path)
+            
+        worker = SFTPFileSaveWorker(self.sftp_client, remote_path, local_tmp, content)
+        self.tasks_panel.add_task(worker, f"Save Editor: {os.path.basename(remote_path)}")
+        worker.progress.connect(lambda cur, tot: self.tasks_panel.update_task_progress(worker, cur, tot))
+        worker.error.connect(lambda msg: self.tasks_panel.error_task(worker, msg))
+
+        def on_save_success(msg):
+            self.tasks_panel.complete_task(worker, msg)
             self.status_label.setText(tr("editor.saved", name=os.path.basename(remote_path)))
-        except Exception as e:
-            QMessageBox.warning(self, tr("error"), str(e))
+
+        worker.finished.connect(on_save_success)
+        worker.error.connect(lambda msg: QMessageBox.warning(self, "Editor Save Error", msg))
+        worker.finished.connect(lambda *_: self._cleanup_worker(worker))
+        
+        self._workers.append(worker)
+        worker.start()
 
     # ────────────────────────────────────────────────────────────
     #  Helpers

@@ -8,9 +8,9 @@ from PyQt6.QtWidgets import (
     QFileDialog, QApplication,
 )
 
-from i18n import tr, list_languages, set_language, get_current_language
-import theme_manager
-from crypto_store import CryptoStore
+from openscp.utils.i18n import tr, list_languages, set_language, get_current_language
+from openscp.utils import theme_manager
+from openscp.core.crypto_store import CryptoStore
 
 
 def _center_dialog(dialog: QDialog):
@@ -91,16 +91,19 @@ class SettingsDialog(QDialog):
         form.setSpacing(8)
 
         self.input_old_pw = QLineEdit()
+        self.input_old_pw.setMinimumHeight(35)
         self.input_old_pw.setEchoMode(QLineEdit.EchoMode.Password)
         self.input_old_pw.setPlaceholderText(tr("settings.old_pw"))
         form.addRow(tr("settings.old_pw"), self.input_old_pw)
 
         self.input_new_pw = QLineEdit()
+        self.input_new_pw.setMinimumHeight(35)
         self.input_new_pw.setEchoMode(QLineEdit.EchoMode.Password)
         self.input_new_pw.setPlaceholderText(tr("settings.new_pw"))
         form.addRow(tr("settings.new_pw"), self.input_new_pw)
 
         self.input_confirm_pw = QLineEdit()
+        self.input_confirm_pw.setMinimumHeight(35)
         self.input_confirm_pw.setEchoMode(QLineEdit.EchoMode.Password)
         self.input_confirm_pw.setPlaceholderText(tr("settings.confirm_pw"))
         form.addRow(tr("settings.confirm_pw"), self.input_confirm_pw)

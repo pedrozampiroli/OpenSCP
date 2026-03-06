@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QLineEdit, QMessageBox, QTextEdit,
 )
 
-from i18n import tr
+from openscp.utils.i18n import tr
 
 
 # ────────────────────────────────────────────────────────────────
@@ -163,6 +163,9 @@ class TextEditorWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setWindowFlags(Qt.WindowType.Window)
+        self.setWindowTitle("OpenSCP Editor")
+        self.resize(900, 600)
         self._tabs: dict[str, dict] = {}  # remote_path -> {editor, highlighter, local_tmp}
         self._setup_ui()
 

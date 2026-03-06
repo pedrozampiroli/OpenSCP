@@ -6,7 +6,7 @@ import os
 import shutil
 from pathlib import Path
 
-THEMES_SYSTEM_DIR = Path(__file__).parent / "themes"
+THEMES_SYSTEM_DIR = Path(__file__).parent.parent.parent / "resources" / "themes"
 THEMES_USER_DIR = Path.home() / ".openscp" / "themes"
 SETTINGS_FILE = Path.home() / ".openscp" / "settings.json"
 

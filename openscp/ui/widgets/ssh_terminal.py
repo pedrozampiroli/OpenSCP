@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import re
 import time
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QTextCursor, QKeyEvent
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
 
-from i18n import tr
+from openscp.utils.i18n import tr
+from openscp.ui.widgets.terminal_highlighter import TerminalHighlighter
 
 
 class ChannelReader(QThread):
@@ -95,6 +96,7 @@ class SSHTerminalWidget(QWidget):
         font = QFont("Menlo", 13)
         font.setStyleHint(QFont.StyleHint.Monospace)
         self.output.setFont(font)
+        self.highlighter = TerminalHighlighter(self.output.document())
         layout.addWidget(self.output)
 
     def connect_to_ssh(self, ssh_client):
@@ -110,6 +112,8 @@ class SSHTerminalWidget(QWidget):
             # Tell the shell to disable prompt extras
             self._channel.send("export TERM=dumb\n")
             self._channel.send("unset PROMPT_COMMAND\n")
+            self._channel.send("alias clear='printf \"\\\\033[2J\\\\033[3J\\\\033[H\"'\n")
+            self._channel.send("clear\n")
 
             self._reader = ChannelReader(self._channel)
             self._reader.output_received.connect(self._on_output)
@@ -146,15 +150,26 @@ class SSHTerminalWidget(QWidget):
 
     def _on_output(self, text: str):
         # Detect form feed (clear screen) in the raw output
-        if '\x0c' in text or '\033[2J' in text or '\033[H\033[2J' in text:
+        if '\x0c' in text or '\033[2J' in text or '\033[H\033[2J' in text or '\033[3J' in text:
             self.output.clear()
-            text = text.replace('\x0c', '')
+            text = text.replace('\x0c', '').replace('\033[H', '').replace('\033[2J', '').replace('\033[3J', '')
+            
         clean = strip_escape_sequences(text)
         if not clean:
             return
+            
         cursor = self.output.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
-        cursor.insertText(clean)
+        
+        # Process character by character to handle backspaces visually
+        for char in clean:
+            if char in ('\x08', '\x7f'):
+                cursor.deletePreviousChar()
+            elif char == '\x07':
+                pass  # ignore bell
+            else:
+                cursor.insertText(char)
+                
         self.output.setTextCursor(cursor)
         self.output.ensureCursorVisible()
 
@@ -173,6 +188,39 @@ class TerminalTextEdit(QTextEdit):
 
     key_pressed = pyqtSignal(bytes)
     clear_requested = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat("application/x-sftp-remote-paths") or event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasFormat("application/x-sftp-remote-paths") or event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasFormat("application/x-sftp-remote-paths"):
+            data = event.mimeData().data("application/x-sftp-remote-paths").data().decode("utf-8")
+            paths = [p for p in data.split("\\n") if p]
+            if paths:
+                text = " ".join(f"'{p}'" for p in paths) + " "
+                self.key_pressed.emit(text.encode("utf-8"))
+            event.acceptProposedAction()
+        elif event.mimeData().hasUrls():
+            paths = [u.toLocalFile() for u in event.mimeData().urls() if u.toLocalFile()]
+            if paths:
+                text = " ".join(f"'{p}'" for p in paths) + " "
+                self.key_pressed.emit(text.encode("utf-8"))
+            event.acceptProposedAction()
+        else:
+            super().dropEvent(event)
 
     def keyPressEvent(self, event: QKeyEvent):
         key = event.key()
@@ -205,7 +253,16 @@ class TerminalTextEdit(QTextEdit):
 
         # Enter / Return
         if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            cursor = self.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            cursor.select(QTextCursor.SelectionType.LineUnderCursor)
+            line = cursor.selectedText().strip()
+            
             self.key_pressed.emit(b"\n")
+            
+            # Intercept 'clear' or 'reset' commands visually
+            if line.endswith("clear") or line.endswith("reset"):
+                QTimer.singleShot(50, self.clear_requested.emit)
             return
 
         # Backspace

@@ -148,14 +148,9 @@ class RemotePanel(QWidget):
         header.addWidget(self.btn_refresh)
         layout.addLayout(header)
 
+        from openscp.ui.widgets.breadcrumb_navigator import BreadcrumbNavigator
         # ── Path bar ──
-        self.path_edit = QLineEdit()
-        self.path_edit.setPlaceholderText("Remote path…")
-        self.path_edit.setStyleSheet("""
-            QLineEdit { background: #1e272e; color: #cfd8dc; border: 1px solid #37474f;
-                        border-radius: 4px; padding: 5px 8px; font-size: 12px; }
-            QLineEdit:focus { border-color: #ab47bc; }
-        """)
+        self.path_edit = BreadcrumbNavigator()
         layout.addWidget(self.path_edit)
 
         # ── Tree view ──
@@ -191,7 +186,7 @@ class RemotePanel(QWidget):
         self.tree.doubleClicked.connect(self._on_double_click)
         self.btn_up.clicked.connect(self._go_up)
         self.btn_refresh.clicked.connect(self._refresh)
-        self.path_edit.returnPressed.connect(self._on_path_entered)
+        self.path_edit.path_entered.connect(self._on_path_entered)
         self.tree.customContextMenuRequested.connect(self._show_context_menu)
         self.tree.upload_drop_requested.connect(lambda paths, target: self.upload_requested.emit(paths, target))
 
@@ -200,7 +195,7 @@ class RemotePanel(QWidget):
     def populate(self, remote_path: str, items: list):
         """Fill the model from sftp.listdir_attr() results."""
         self.current_path = remote_path
-        self.path_edit.setText(remote_path)
+        self.path_edit.set_path(remote_path, is_remote=True)
         self.model.removeRows(0, self.model.rowCount())
 
         # Sort: dirs first, then files, both alphabetical
@@ -244,7 +239,7 @@ class RemotePanel(QWidget):
 
     def clear(self):
         self.model.removeRows(0, self.model.rowCount())
-        self.path_edit.clear()
+        self.path_edit.set_path("/", is_remote=True)
         self.current_path = "/"
 
     # ── Navigation ──
@@ -264,8 +259,8 @@ class RemotePanel(QWidget):
     def _refresh(self):
         self.navigate_requested.emit(self.current_path)
 
-    def _on_path_entered(self):
-        path = self.path_edit.text().strip()
+    def _on_path_entered(self, path: str):
+        path = path.strip()
         if path:
             self.navigate_requested.emit(path)
 

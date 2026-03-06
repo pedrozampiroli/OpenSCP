@@ -5,7 +5,7 @@ import sys
 import os
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
-from main_window import MainWindow
+from openscp.ui.windows.main_window import MainWindow
 
 
 def resource_path(relative_path):
