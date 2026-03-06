@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QPushButton, QLabel, QProgressBar, QMessageBox, QStatusBar,
@@ -35,6 +37,16 @@ BTN_STYLE = """
 """
 
 
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller."""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -46,6 +58,11 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(tr("app.title"))
         self.setMinimumSize(1100, 700)
         self.resize(1300, 820)
+        
+        # Set window icon
+        icon_path = resource_path("icon/OpenSCPIcon.jpg")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
 
         # State
         self.ssh_client = None
