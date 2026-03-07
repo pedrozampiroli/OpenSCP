@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem,
     QPushButton, QLabel, QLineEdit, QMessageBox, QInputDialog,
     QFileDialog, QFormLayout, QSpinBox, QComboBox, QApplication,
+    QWidget,
 )
 
 from openscp.core.crypto_store import CryptoStore
@@ -69,7 +70,7 @@ class MasterPasswordDialog(QDialog):
 
         lbl = QLabel(tr("dlg.master_pw.create") if is_new else tr("dlg.master_pw.unlock"))
         lbl.setWordWrap(True)
-        lbl.setStyleSheet("font-size: 13px;")
+        lbl.setObjectName("master_pw_label")
         layout.addWidget(lbl)
 
         self.input_password = QLineEdit()
@@ -85,7 +86,7 @@ class MasterPasswordDialog(QDialog):
 
         remember_row = QHBoxLayout()
         remember_lbl = QLabel(tr("dlg.master_pw.remember"))
-        remember_lbl.setStyleSheet("font-size: 11px;")
+        remember_lbl.setObjectName("remember_label")
         self.remember_combo = QComboBox()
         for key in REMEMBER_OPTIONS_KEYS:
             self.remember_combo.addItem(tr(key))
@@ -98,6 +99,7 @@ class MasterPasswordDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         self.btn_ok = QPushButton(tr("dlg.master_pw.btn_unlock") if not is_new else tr("dlg.master_pw.btn_create"))
+        self.btn_ok.setObjectName("btn_master_pw")
         self.btn_ok.clicked.connect(self._validate)
         self.btn_cancel = QPushButton(tr("cancel"))
         self.btn_cancel.clicked.connect(self.reject)
@@ -176,7 +178,7 @@ class ConnectionEditorDialog(QDialog):
         # ── Private key ──
         key_row = QHBoxLayout()
         self.key_label = QLabel(self._key_status_text())
-        self.key_label.setStyleSheet("font-size: 11px;")
+        self.key_label.setObjectName("key_status_label")
         key_row.addWidget(self.key_label, stretch=1)
 
         btn_browse = QPushButton(tr("dlg.conn_editor.key_browse"))
@@ -202,6 +204,7 @@ class ConnectionEditorDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         btn_save = QPushButton(tr("dlg.conn_editor.save"))
+        btn_save.setObjectName("btn_save_conn")
         btn_save.clicked.connect(self._save)
         btn_cancel = QPushButton(tr("cancel"))
         btn_cancel.clicked.connect(self.reject)
@@ -312,7 +315,7 @@ class ConnectionManagerDialog(QDialog):
         layout.setSpacing(10)
 
         title = QLabel(tr("dlg.conn_mgr.saved"))
-        title.setStyleSheet("font-size: 16px; font-weight: 700; margin-bottom: 4px;")
+        title.setObjectName("conn_mgr_title")
         layout.addWidget(title)
 
         body = QHBoxLayout()
@@ -327,6 +330,7 @@ class ConnectionManagerDialog(QDialog):
         btn_col.setSpacing(6)
 
         self.btn_connect = QPushButton(tr("dlg.conn_mgr.connect"))
+        self.btn_connect.setObjectName("btn_mgr_connect")
         self.btn_connect.clicked.connect(self._on_connect)
         self.btn_add = QPushButton(tr("dlg.conn_mgr.add"))
         self.btn_add.clicked.connect(self._on_add)
@@ -342,9 +346,9 @@ class ConnectionManagerDialog(QDialog):
         btn_col.addWidget(self.btn_delete)
         btn_col.addStretch()
 
-        sep = QLabel("")
+        sep = QWidget()
+        sep.setObjectName("mgr_sep")
         sep.setFixedHeight(1)
-        sep.setStyleSheet("background: #2a3a4a;")
         btn_col.addWidget(sep)
 
         self.btn_export = QPushButton(tr("dlg.conn_mgr.export"))
@@ -358,7 +362,7 @@ class ConnectionManagerDialog(QDialog):
         layout.addLayout(body, stretch=1)
 
         hint = QLabel(tr("dlg.conn_mgr.hint"))
-        hint.setStyleSheet("font-size: 11px; font-style: italic;")
+        hint.setObjectName("conn_mgr_hint")
         layout.addWidget(hint)
 
     def _refresh_list(self):

@@ -28,7 +28,9 @@ class SettingsDialog(QDialog):
     def __init__(self, store: CryptoStore | None = None, master_password: str = "", parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("settings.title"))
-        self.setFixedSize(480, 400)
+        self.setMinimumWidth(500)
+        self.setMinimumHeight(520)
+        self.resize(500, 550)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
 
         self.store = store
@@ -50,7 +52,8 @@ class SettingsDialog(QDialog):
         # ── Appearance ──
         appearance_group = QGroupBox(tr("settings.appearance"))
         appearance_layout = QFormLayout()
-        appearance_layout.setSpacing(10)
+        appearance_layout.setSpacing(12)
+        appearance_layout.setContentsMargins(15, 15, 15, 15)
 
         # Theme selector
         self.theme_combo = QComboBox()
@@ -85,25 +88,27 @@ class SettingsDialog(QDialog):
         # ── Security ──
         security_group = QGroupBox(tr("settings.security"))
         sec_layout = QVBoxLayout()
-        sec_layout.setSpacing(10)
+        sec_layout.setSpacing(12)
+        sec_layout.setContentsMargins(15, 15, 15, 15)
 
         form = QFormLayout()
-        form.setSpacing(8)
+        form.setSpacing(10)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
 
         self.input_old_pw = QLineEdit()
-        self.input_old_pw.setMinimumHeight(35)
+        self.input_old_pw.setMinimumHeight(32)
         self.input_old_pw.setEchoMode(QLineEdit.EchoMode.Password)
         self.input_old_pw.setPlaceholderText(tr("settings.old_pw"))
         form.addRow(tr("settings.old_pw"), self.input_old_pw)
 
         self.input_new_pw = QLineEdit()
-        self.input_new_pw.setMinimumHeight(35)
+        self.input_new_pw.setMinimumHeight(32)
         self.input_new_pw.setEchoMode(QLineEdit.EchoMode.Password)
         self.input_new_pw.setPlaceholderText(tr("settings.new_pw"))
         form.addRow(tr("settings.new_pw"), self.input_new_pw)
 
         self.input_confirm_pw = QLineEdit()
-        self.input_confirm_pw.setMinimumHeight(35)
+        self.input_confirm_pw.setMinimumHeight(32)
         self.input_confirm_pw.setEchoMode(QLineEdit.EchoMode.Password)
         self.input_confirm_pw.setPlaceholderText(tr("settings.confirm_pw"))
         form.addRow(tr("settings.confirm_pw"), self.input_confirm_pw)
@@ -111,6 +116,7 @@ class SettingsDialog(QDialog):
         sec_layout.addLayout(form)
 
         btn_change_pw = QPushButton(tr("settings.change_pw"))
+        btn_change_pw.setMinimumHeight(35)
         btn_change_pw.clicked.connect(self._change_password)
         sec_layout.addWidget(btn_change_pw)
 
@@ -122,7 +128,7 @@ class SettingsDialog(QDialog):
         # Close button
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        btn_close = QPushButton(tr("cancel"))
+        btn_close = QPushButton(tr("close"))
         btn_close.clicked.connect(self.accept)
         btn_row.addWidget(btn_close)
         layout.addLayout(btn_row)

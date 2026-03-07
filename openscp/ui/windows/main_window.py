@@ -84,28 +84,18 @@ class MainWindow(QMainWindow):
         toolbar.setSpacing(8)
 
         self.btn_saved = QPushButton(tr("toolbar.connections"))
-        self.btn_saved.setStyleSheet(BTN_STYLE % {
-            "bg": "qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #4a148c, stop:1 #6a1b9a)",
-            "hover": "qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #6a1b9a, stop:1 #8e24aa)",
-        })
+        self.btn_saved.setObjectName("btn_connections")
         toolbar.addWidget(self.btn_saved)
 
         self.btn_disconnect = QPushButton(tr("toolbar.disconnect"))
-        self.btn_disconnect.setStyleSheet(BTN_STYLE % {
-            "bg": "qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #b71c1c, stop:1 #c62828)",
-            "hover": "qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #c62828, stop:1 #e53935)",
-        })
+        self.btn_disconnect.setObjectName("btn_disconnect")
         toolbar.addWidget(self.btn_disconnect)
 
         self.btn_settings = QPushButton(tr("toolbar.settings"))
-        self.btn_settings.setStyleSheet(BTN_STYLE % {
-            "bg": "qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #37474f, stop:1 #455a64)",
-            "hover": "qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #455a64, stop:1 #546e7a)",
-        })
+        self.btn_settings.setObjectName("btn_settings")
         toolbar.addWidget(self.btn_settings)
 
         self.conn_info_label = QLabel("")
-        self.conn_info_label.setStyleSheet("font-size: 12px; padding-left: 8px;")
         toolbar.addWidget(self.conn_info_label)
 
         toolbar.addStretch()

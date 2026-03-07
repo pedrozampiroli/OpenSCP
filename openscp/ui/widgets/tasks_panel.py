@@ -18,6 +18,7 @@ class TaskItemWidget(QWidget):
         layout.setContentsMargins(10, 5, 10, 5)
 
         self.label_title = QLabel(title)
+        self.label_title.setObjectName("task_title")
         self.label_title.setStyleSheet("font-weight: bold;")
         
         self.progress_bar = QProgressBar()
@@ -27,6 +28,7 @@ class TaskItemWidget(QWidget):
         self.progress_bar.setFixedWidth(200)
 
         self.label_status = QLabel(tr("status.connecting"))
+        self.label_status.setObjectName("task_status")
         self.label_status.setFixedWidth(120)
         self.label_status.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
@@ -47,12 +49,16 @@ class TaskItemWidget(QWidget):
         self.progress_bar.setMaximum(100)
         self.progress_bar.setValue(100)
         self.label_status.setText(msg)
-        self.label_title.setStyleSheet("color: #4caf50; font-weight: bold;")
+        self.label_status.setProperty("state", "finished")
+        self.label_status.style().unpolish(self.label_status)
+        self.label_status.style().polish(self.label_status)
 
     def set_error(self, msg: str):
         self.label_status.setText("Error")
+        self.label_status.setProperty("state", "error")
+        self.label_status.style().unpolish(self.label_status)
+        self.label_status.style().polish(self.label_status)
         self.label_title.setText(self.label_title.text() + f" - {msg}")
-        self.label_title.setStyleSheet("color: #f44336; font-weight: bold;")
 
 
 class TasksPanelWidget(QWidget):
@@ -67,11 +73,8 @@ class TasksPanelWidget(QWidget):
         layout.setSpacing(0)
 
         self.list_widget = QListWidget()
+        self.list_widget.setObjectName("tasks_list")
         self.list_widget.setSelectionMode(QListWidget.SelectionMode.NoSelection)
-        self.list_widget.setStyleSheet("""
-            QListWidget { background: #1e272e; border: none; }
-            QListWidget::item { border-bottom: 1px solid #37474f; padding: 2px; }
-        """)
         
         layout.addWidget(self.list_widget)
 

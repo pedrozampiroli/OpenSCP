@@ -127,24 +127,18 @@ class RemotePanel(QWidget):
         # ── Header ──
         header = QHBoxLayout()
         title = QLabel("  ⬡  REMOTE")
-        title.setStyleSheet("font-weight: 700; font-size: 11px; color: #ce93d8; letter-spacing: 1.5px;")
+        title.setObjectName("remote_panel_title")
         header.addWidget(title)
         header.addStretch()
 
         self.btn_up = QPushButton("⬆")
         self.btn_up.setToolTip("Go to parent directory")
         self.btn_up.setFixedSize(28, 28)
-        self.btn_up.setStyleSheet("""
-            QPushButton { background: #37474f; color: #e0e0e0; border: 1px solid #455a64;
-                          border-radius: 4px; font-size: 13px; }
-            QPushButton:hover { background: #455a64; }
-        """)
         header.addWidget(self.btn_up)
 
         self.btn_refresh = QPushButton("⟳")
         self.btn_refresh.setToolTip("Refresh")
         self.btn_refresh.setFixedSize(28, 28)
-        self.btn_refresh.setStyleSheet(self.btn_up.styleSheet())
         header.addWidget(self.btn_refresh)
         layout.addLayout(header)
 
@@ -164,19 +158,7 @@ class RemotePanel(QWidget):
         self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         for col in (1, 2, 3):
             self.tree.header().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
-        self.tree.setStyleSheet("""
-            QTreeView {
-                background: #1a2332; color: #dce6f0; border: 1px solid #2a3a4a;
-                border-radius: 4px; font-size: 12px;
-                selection-background-color: #6a1b9a;
-            }
-            QTreeView::item:hover { background: #2a2342; }
-            QTreeView::branch { background: #1a2332; }
-            QHeaderView::section {
-                background: #212d3d; color: #90a4ae; border: none;
-                padding: 4px 6px; font-size: 11px; font-weight: 600;
-            }
-        """)
+        
         self.tree.setSortingEnabled(True)
         self.tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -268,10 +250,6 @@ class RemotePanel(QWidget):
 
     def _show_context_menu(self, pos: QPoint):
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu { background: #263238; color: #eceff1; border: 1px solid #37474f; border-radius: 4px; }
-            QMenu::item:selected { background: #6a1b9a; }
-        """)
 
         idx = self.tree.indexAt(pos)
         selected_paths = self._get_selected_paths()

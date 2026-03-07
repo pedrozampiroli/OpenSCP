@@ -50,6 +50,7 @@ class ChannelReader(QThread):
 #   - CSI sequences:  ESC [ ... final_byte       — e.g. colors, cursor, bracketed paste
 #   - Simple escapes: ESC ( | ESC ) | ESC =      — charset/mode switches
 #   - Also bare ] ... BEL/ESC\ without leading ESC (some terminals emit these)
+#   - We NO LONGER strip \r here to handle it in the output loop
 _ANSI_RE = re.compile(
     r'(?:'
     r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)'  # OSC: ESC ] ... (BEL | ST)
@@ -58,7 +59,6 @@ _ANSI_RE = re.compile(
     r'|\x1b[()=][0-9A-Za-z]?'              # charset / mode
     r'|\x1b\]8;[^;]*;[^\x1b\x07]*(?:\x07|\x1b\\)'  # OSC 8 hyperlinks
     r'|\x07'                                # stray BEL
-    r'|\r'                                  # carriage returns
     r')'
 )
 
@@ -149,27 +149,40 @@ class SSHTerminalWidget(QWidget):
             self._channel.send(b"\x0c")
 
     def _on_output(self, text: str):
-        # Detect form feed (clear screen) in the raw output
-        if '\x0c' in text or '\033[2J' in text or '\033[H\033[2J' in text or '\033[3J' in text:
+        # Detect clear screen sequences
+        if any(seq in text for seq in ('\x0c', '\033[2J', '\033[3J', '\033[H')):
             self.output.clear()
-            text = text.replace('\x0c', '').replace('\033[H', '').replace('\033[2J', '').replace('\033[3J', '')
-            
+            # Remove the sequences from text to avoid further processing
+            for seq in ('\x0c', '\033[2J', '\033[3J', '\033[H'):
+                text = text.replace(seq, '')
+
         clean = strip_escape_sequences(text)
         if not clean:
             return
-            
+
         cursor = self.output.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        
-        # Process character by character to handle backspaces visually
+
         for char in clean:
-            if char in ('\x08', '\x7f'):
-                cursor.deletePreviousChar()
-            elif char == '\x07':
-                pass  # ignore bell
+            if char == '\r':
+                # Move to start of line to allow overprinting (fixes prompt duplication)
+                cursor.movePosition(QTextCursor.MoveOperation.StartOfLine)
+            elif char == '\n':
+                # Ensure we are at the end before adding a newline
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                cursor.insertText('\n')
+            elif char == '\x08':
+                # Move cursor left (standard terminal behavior)
+                # If followed by a space (shell echo), it will 'delete' visually
+                cursor.movePosition(QTextCursor.MoveOperation.Left)
+            elif char == '\x7f':
+                # Delete char at cursor
+                cursor.deleteChar()
+            elif char == '\x07': # Bell
+                pass
             else:
+                # Insert text at current cursor position
                 cursor.insertText(char)
-                
+
         self.output.setTextCursor(cursor)
         self.output.ensureCursorVisible()
 
@@ -229,45 +242,57 @@ class TerminalTextEdit(QTextEdit):
         # Ctrl+C → interrupt
         if key == Qt.Key.Key_C and modifiers & Qt.KeyboardModifier.ControlModifier:
             self.key_pressed.emit(b"\x03")
+            event.accept()
             return
 
         # Ctrl+D → EOF
         if key == Qt.Key.Key_D and modifiers & Qt.KeyboardModifier.ControlModifier:
             self.key_pressed.emit(b"\x04")
+            event.accept()
             return
 
         # Ctrl+Z → suspend
         if key == Qt.Key.Key_Z and modifiers & Qt.KeyboardModifier.ControlModifier:
             self.key_pressed.emit(b"\x1a")
+            event.accept()
             return
 
         # Ctrl+L → clear screen
         if key == Qt.Key.Key_L and modifiers & Qt.KeyboardModifier.ControlModifier:
             self.clear_requested.emit()
+            event.accept()
+            return
+
+        # Ctrl+W or Alt+Backspace → delete word
+        is_alt_backspace = (key == Qt.Key.Key_Backspace and modifiers & Qt.KeyboardModifier.AltModifier)
+        is_ctrl_w = (key == Qt.Key.Key_W and modifiers & Qt.KeyboardModifier.ControlModifier)
+        if is_alt_backspace or is_ctrl_w:
+            self.key_pressed.emit(b"\x17")
+            event.accept()
+            return
+
+        # Ctrl+U → delete line (unix style)
+        if key == Qt.Key.Key_U and modifiers & Qt.KeyboardModifier.ControlModifier:
+            self.key_pressed.emit(b"\x15")
+            event.accept()
             return
 
         # Tab → autocomplete
         if key == Qt.Key.Key_Tab:
             self.key_pressed.emit(b"\t")
+            event.accept()
             return
 
         # Enter / Return
         if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            cursor = self.textCursor()
-            cursor.movePosition(QTextCursor.MoveOperation.End)
-            cursor.select(QTextCursor.SelectionType.LineUnderCursor)
-            line = cursor.selectedText().strip()
-            
             self.key_pressed.emit(b"\n")
-            
-            # Intercept 'clear' or 'reset' commands visually
-            if line.endswith("clear") or line.endswith("reset"):
-                QTimer.singleShot(50, self.clear_requested.emit)
+            event.accept()
             return
 
         # Backspace
         if key == Qt.Key.Key_Backspace:
             self.key_pressed.emit(b"\x7f")
+            event.accept()
             return
 
         # Arrow keys → ANSI escape sequences
@@ -279,27 +304,36 @@ class TerminalTextEdit(QTextEdit):
         }
         if key in arrow_map:
             self.key_pressed.emit(arrow_map[key])
+            event.accept()
             return
 
         # Home / End
         if key == Qt.Key.Key_Home:
             self.key_pressed.emit(b"\x1b[H")
+            event.accept()
             return
         if key == Qt.Key.Key_End:
             self.key_pressed.emit(b"\x1b[F")
+            event.accept()
             return
 
         # Delete
         if key == Qt.Key.Key_Delete:
             self.key_pressed.emit(b"\x1b[3~")
+            event.accept()
             return
 
         # Escape
         if key == Qt.Key.Key_Escape:
             self.key_pressed.emit(b"\x1b")
+            event.accept()
             return
 
         # Regular text
         text = event.text()
         if text:
             self.key_pressed.emit(text.encode("utf-8"))
+            event.accept()
+            return
+            
+        super().keyPressEvent(event)

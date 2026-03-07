@@ -185,6 +185,20 @@ QPushButton:disabled {{
     border-color: {border};
 }}
 
+/* ── Toolbar Buttons ── */
+QPushButton#btn_connections {{
+    background: {accent2};
+    color: white;
+    font-weight: bold;
+}}
+QPushButton#btn_disconnect {{
+    background: {error};
+    color: white;
+}}
+QPushButton#btn_settings {{
+    background: {bg_tertiary};
+}}
+
 /* ── Tree views ── */
 QTreeView {{
     background: {bg_secondary};
@@ -193,6 +207,16 @@ QTreeView {{
     border-radius: 4px;
     font-size: 12px;
     selection-background-color: {selection};
+    selection-color: {fg};
+    outline: none;
+}}
+QTreeView::item {{
+    padding: 3px;
+    border: none;
+}}
+QTreeView::item:selected {{
+    background: {selection};
+    color: {fg};
 }}
 QTreeView::item:hover {{
     background: {bg_tertiary};
@@ -203,10 +227,77 @@ QTreeView::branch {{
 QHeaderView::section {{
     background: {header_bg};
     color: {header_fg};
-    border: none;
-    padding: 4px 6px;
+    border: 1px solid {border};
+    padding: 6px;
     font-size: 11px;
     font-weight: 600;
+}}
+
+/* ── Panel Titles ── */
+QLabel#local_panel_title {{
+    color: {local_accent};
+    font-weight: bold;
+    font-size: 11px;
+    letter-spacing: 1.2px;
+}}
+QLabel#remote_panel_title {{
+    color: {remote_accent};
+    font-weight: bold;
+    font-size: 11px;
+    letter-spacing: 1.2px;
+}}
+
+/* ── Breadcrumb Navigator ── */
+QWidget#breadcrumb_container {{
+    background: {bg};
+    border: 1px solid {border};
+    border-radius: 4px;
+}}
+QPushButton#breadcrumb_btn {{
+    background: transparent;
+    color: {fg_dim};
+    border: none;
+    padding: 0px 6px;
+    font-size: 12px;
+    font-weight: bold;
+}}
+QPushButton#breadcrumb_btn:hover {{
+    background: {bg_tertiary};
+    color: {fg};
+    border-radius: 3px;
+}}
+QLabel#breadcrumb_sep {{
+    color: {fg_muted};
+    font-weight: bold;
+    padding: 0px 2px;
+}}
+QLineEdit#path_edit_navigator {{
+    background: {input_bg};
+    color: {fg};
+    border: 1px solid {border_active};
+    border-radius: 4px;
+}}
+
+/* ── Tasks Panel ── */
+QListWidget#tasks_list {{
+    background: {bg};
+    border: none;
+}}
+QListWidget#tasks_list::item {{
+    border-bottom: 1px solid {border};
+    padding: 2px;
+}}
+QLabel#task_title {{
+    color: {fg};
+}}
+QLabel#task_status {{
+    color: {fg_dim};
+}}
+QLabel#task_status[state="finished"] {{
+    color: {success};
+}}
+QLabel#task_status[state="error"] {{
+    color: {error};
 }}
 
 /* ── Lists ── */
@@ -221,12 +312,32 @@ QListWidget {{
 QListWidget::item {{
     padding: 8px 10px;
     border-radius: 3px;
+    color: {fg};
 }}
 QListWidget::item:selected {{
     background: {selection};
+    color: {fg};
 }}
 QListWidget::item:hover {{
     background: {bg_tertiary};
+}}
+
+/* ── Connection Manager Specific ── */
+QLabel#conn_mgr_title {{
+    font-size: 16px;
+    font-weight: bold;
+    color: {accent};
+}}
+QLabel#conn_mgr_hint {{
+    color: {fg_muted};
+}}
+QWidget#mgr_sep {{
+    background: {border};
+}}
+QPushButton#btn_mgr_connect {{
+    background: {accent};
+    color: {bg};
+    font-weight: bold;
 }}
 
 /* ── Tabs ── */

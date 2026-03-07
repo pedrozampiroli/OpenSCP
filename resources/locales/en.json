@@ -101,5 +101,6 @@
     "settings.theme_imported": "Theme \"{name}\" imported successfully.",
     "error": "Error",
     "cancel": "Cancel",
+    "close": "Close",
     "confirm": "Confirm"
 }

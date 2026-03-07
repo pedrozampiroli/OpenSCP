@@ -20,15 +20,7 @@ class BreadcrumbNavigator(QStackedWidget):
 
         # Page 0: Breadcrumbs
         self.breadcrumb_container = QWidget()
-        self.breadcrumb_container.setStyleSheet("""
-            QWidget { background: #1e272e; border: 1px solid #37474f; border-radius: 4px; }
-            QPushButton { 
-                background: transparent; color: #cfd8dc; 
-                border: none; padding: 0px 4px; font-size: 12px; font-weight: bold;
-            }
-            QPushButton:hover { background: #37474f; color: #ffffff; border-radius: 3px; }
-            QLabel { color: #546e7a; font-weight: bold; padding: 0px 2px; }
-        """)
+        self.breadcrumb_container.setObjectName("breadcrumb_container")
         self.breadcrumb_layout = QHBoxLayout(self.breadcrumb_container)
         self.breadcrumb_layout.setContentsMargins(4, 2, 4, 2)
         self.breadcrumb_layout.setSpacing(0)
@@ -36,10 +28,8 @@ class BreadcrumbNavigator(QStackedWidget):
 
         # Page 1: Line Edit
         self.path_edit = QLineEdit()
-        self.path_edit.setStyleSheet("""
-            QLineEdit { background: #1e272e; color: #cfd8dc; border: 1px solid #42a5f5;
-                        border-radius: 4px; padding: 5px 8px; font-size: 12px; }
-        """)
+        self.path_edit.setObjectName("path_edit_navigator")
+        self.path_edit.setPlaceholderText("Enter path...")
         self.path_edit.returnPressed.connect(self._on_return_pressed)
         
         # Override focus out to switch back
@@ -103,6 +93,7 @@ class BreadcrumbNavigator(QStackedWidget):
 
         # Create root button
         btn_root = QPushButton(root_text)
+        btn_root.setObjectName("breadcrumb_btn")
         btn_root.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_root.clicked.connect(lambda _, p=root_path: self.path_entered.emit(p))
         self.breadcrumb_layout.addWidget(btn_root)
@@ -113,9 +104,11 @@ class BreadcrumbNavigator(QStackedWidget):
 
         for part in parts:
             lbl_sep = QLabel("›")
+            lbl_sep.setObjectName("breadcrumb_sep")
             self.breadcrumb_layout.addWidget(lbl_sep)
 
             btn = QPushButton(part)
+            btn.setObjectName("breadcrumb_btn")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             
             current_build += part
