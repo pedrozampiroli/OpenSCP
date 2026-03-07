@@ -59,7 +59,6 @@ clean:
 	rm -f $(APP_NAME).dmg
 	rm -f icon.png
 	rm -rf $(APP_NAME).AppDir
-
 lint:
 	$(PYTHON) -c "import py_compile, glob; files = glob.glob('openscp/**/*.py', recursive=True); [py_compile.compile(f, doraise=True) for f in files]; print(f'✓ {len(files)} files OK')"
 
