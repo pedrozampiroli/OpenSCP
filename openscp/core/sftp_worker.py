@@ -1,10 +1,63 @@
 """SFTP connection and transfer workers running on background threads."""
 from __future__ import annotations
 
+import base64
+import io
 import os
+import shutil
 import stat as stat_module
+import subprocess
+import tempfile
+
 import paramiko
 from PyQt6.QtCore import QThread, pyqtSignal
+
+
+def _load_paramiko_key(key_data: str, passphrase: str | None) -> paramiko.PKey | None:
+    for key_class in (paramiko.RSAKey, paramiko.Ed25519Key, paramiko.ECDSAKey):
+        try:
+            return key_class.from_private_key(io.StringIO(key_data), password=passphrase)
+        except Exception:
+            continue
+    return None
+
+
+def _load_ppk_key(key_data: str, passphrase: str | None) -> tuple[paramiko.PKey | None, str]:
+    puttygen = shutil.which("puttygen")
+    if not puttygen:
+        return None, "`puttygen` was not found in PATH."
+
+    with tempfile.TemporaryDirectory(prefix="openscp-ppk-") as temp_dir:
+        input_path = os.path.join(temp_dir, "key.ppk")
+        output_path = os.path.join(temp_dir, "key.openssh")
+
+        with open(input_path, "w", encoding="utf-8") as input_file:
+            input_file.write(key_data)
+
+        command = [puttygen, input_path, "-O", "private-openssh", "-o", output_path]
+
+        if passphrase is not None:
+            passphrase_path = os.path.join(temp_dir, "passphrase.txt")
+            with open(passphrase_path, "w", encoding="utf-8") as passphrase_file:
+                passphrase_file.write(passphrase)
+                passphrase_file.write("\n")
+            command.extend(["--old-passphrase", passphrase_path])
+
+        try:
+            subprocess.run(command, check=True, capture_output=True, text=True)
+            with open(output_path, "r", encoding="utf-8") as output_file:
+                pkey = _load_paramiko_key(output_file.read(), None)
+                if pkey is None:
+                    return None, "`puttygen` converted the key, but Paramiko could not parse the OpenSSH output."
+                return pkey, ""
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "").strip()
+            stdout = (exc.stdout or "").strip()
+            details = stderr or stdout or str(exc)
+            return None, f"`puttygen` failed to convert the `.ppk` key: {details}"
+        except Exception as exc:
+            return None, f"Unexpected error while converting `.ppk`: {exc}"
+
 
 
 class SFTPConnectWorker(QThread):
@@ -22,24 +75,49 @@ class SFTPConnectWorker(QThread):
         self.password = password
         self.private_key = private_key      # base64-encoded key content
         self.key_passphrase = key_passphrase
+        self._key_error_hint = ""
 
     def _load_pkey(self) -> paramiko.PKey | None:
-        """Try to load a private key from base64-encoded content."""
+        """Try to load a private key from base64-encoded content.
+
+        Supports PuTTY PPK v2/v3 and OpenSSH (RSA, Ed25519, ECDSA) formats.
+        """
         if not self.private_key:
             return None
-        import base64
-        import io
-        key_data = base64.b64decode(self.private_key).decode("utf-8")
-        key_file = io.StringIO(key_data)
+
+        key_bytes = base64.b64decode(self.private_key)
+        try:
+            key_data = key_bytes.decode("utf-8").lstrip("\ufeff")  # strip BOM
+        except UnicodeDecodeError:
+            return None
+
         passphrase = self.key_passphrase or None
-        # Try common key types
-        for key_class in (paramiko.RSAKey, paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.DSSKey):
-            try:
-                key_file.seek(0)
-                return key_class.from_private_key(key_file, password=passphrase)
-            except Exception:
-                continue
-        return None
+
+        # ── PuTTY PPK format ──────────────────────────────────────────────────
+        if key_data.lstrip().startswith("PuTTY-User-Key-File"):
+            if not shutil.which("puttygen"):
+                self._key_error_hint = (
+                    "PuTTY `.ppk` keys require `puttygen` to be installed, "
+                    "or the key must be converted to OpenSSH format."
+                )
+                return None
+
+            pkey, error_hint = _load_ppk_key(key_data, passphrase)
+            if pkey is None:
+                self._key_error_hint = error_hint or (
+                    "Failed to convert the PuTTY `.ppk` key. "
+                    "Check the key passphrase and file contents."
+                )
+            return pkey
+
+        # ── OpenSSH format ────────────────────────────────────────────────────
+        pkey = _load_paramiko_key(key_data, passphrase)
+        if pkey is None:
+            self._key_error_hint = (
+                "Failed to parse the private key. Check the passphrase and make sure "
+                "the key is in a valid OpenSSH/PEM format."
+            )
+        return pkey
 
     def run(self):
         try:
@@ -47,18 +125,27 @@ class SFTPConnectWorker(QThread):
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
             pkey = self._load_pkey()
+
+            # If a private key was provided but couldn't be loaded, abort early
+            if self.private_key and pkey is None:
+                self.error.emit(
+                    self._key_error_hint or
+                    "Failed to load the private key. Check the file format and passphrase."
+                )
+                return
+
             connect_kwargs = {
                 "hostname": self.host,
                 "port": self.port,
                 "username": self.username,
                 "timeout": 10,
+                # Prevent paramiko from trying ssh-agent or ~/.ssh/* keys on its own
+                "allow_agent": False,
+                "look_for_keys": False,
             }
             if pkey:
                 connect_kwargs["pkey"] = pkey
-                # Also pass password if provided (some setups need both)
-                if self.password:
-                    connect_kwargs["password"] = self.password
-            else:
+            elif self.password:
                 connect_kwargs["password"] = self.password
 
             ssh.connect(**connect_kwargs)
